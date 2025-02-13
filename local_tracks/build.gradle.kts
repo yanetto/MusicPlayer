@@ -47,7 +47,12 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
 
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.navigation.runtime.ktx)
+
     implementation(libs.hilt.android)
+    implementation(project(":common_tracks"))
+    implementation(project(":music_player"))
     kapt(libs.hilt.android.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
 

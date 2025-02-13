@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="nothing_found">Ничего не найдено</string>
+    <string name="track_search">Поиск трека</string>
+    <string name="album_cover">Обложка альбома</string>
+    <string name="current_track">Текущий трек</string>
+    <string name="unknown_error_occurred">Произошла неизвестная ошибка</string>
+</resources>

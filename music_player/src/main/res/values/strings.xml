@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="previous_track">предыдущий трек</string>
+    <string name="play_pause">плей/пауза</string>
+    <string name="next_track">следующий трек</string>
+    <string name="album_cover">обложка альбома</string>
+    <string name="close">закрыть</string>
+</resources>

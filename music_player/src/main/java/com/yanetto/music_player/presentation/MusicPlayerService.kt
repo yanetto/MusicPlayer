@@ -75,8 +75,6 @@ class MusicPlayerService : MediaSessionService() {
         notificationManager.createNotificationChannel(channel)
 
         return NotificationCompat.Builder(this, channelId)
-            .setContentTitle("")
-            .setContentText("")
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
     }

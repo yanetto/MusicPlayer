@@ -1,6 +1,5 @@
 package com.yanetto.local_tracks.presentation
 
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.yanetto.common_model.model.Track
@@ -13,6 +12,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -34,35 +34,88 @@ class LocalTracksScreenViewModel @Inject constructor(
 
     fun loadTracks() {
         viewModelScope.launch(Dispatchers.IO) {
-            _uiState.value = TracksUiState.Loading
-            runCatching {
-                repository.getTracks()
-            }.onSuccess { tracks ->
-                if (tracks.isNotEmpty()) {
-                    _uiState.value = TracksUiState.Success(tracks, getCurrentTrack(), getPlayPause(), false)
-                } else {
-                    _uiState.value = TracksUiState.Empty
+
+            _uiState.update { TracksUiState.Loading }
+
+            runCatching { repository.getTracks() }
+                .onSuccess { tracks ->
+                    if (tracks.isNotEmpty()) {
+                        _uiState.update {
+                            TracksUiState.Success(
+                                tracks = tracks,
+                                currentTrack = getCurrentTrack(),
+                                isPlay = isPlaying(),
+                                isLoadingNext = false
+                            )
+                        }
+                    } else {
+                        _uiState.update { TracksUiState.Empty }
+                    }
                 }
-            }.onFailure { error ->
-                _uiState.value = TracksUiState.Error(error.message)
-            }
+                .onFailure { error ->
+                    _uiState.update { TracksUiState.Error(error.message) }
+                }
         }
     }
 
     fun searchTracks(query: String) {
         searchJob?.cancel()
         searchJob = viewModelScope.launch(Dispatchers.IO) {
-            _uiState.value = TracksUiState.Loading
-            runCatching {
-                repository.searchTracks(query)
-            }.onSuccess { tracks ->
-                if (tracks.isNotEmpty()) {
-                    _uiState.value = TracksUiState.Success(tracks, getCurrentTrack(), getPlayPause(), false)
-                } else {
-                    _uiState.value = TracksUiState.Empty
+
+            _uiState.update { TracksUiState.Loading }
+
+            runCatching { repository.searchTracks(query) }
+                .onSuccess { tracks ->
+                    if (tracks.isNotEmpty()) {
+                        _uiState.update {
+                            TracksUiState.Success(
+                                tracks = tracks,
+                                currentTrack = getCurrentTrack(),
+                                isPlay = isPlaying(),
+                                isLoadingNext = false
+                            )
+                        }
+                    } else {
+                        _uiState.update { TracksUiState.Empty }
+                    }
                 }
-            }.onFailure { error ->
-                _uiState.value = TracksUiState.Error(error.message)
+                .onFailure { error ->
+                    _uiState.update { TracksUiState.Error(error.message) }
+                }
+        }
+    }
+
+    fun loadNext() {
+        viewModelScope.launch(Dispatchers.IO) {
+            if (!(_uiState.value as TracksUiState.Success).isLoadingNext) {
+
+                _uiState.update {
+                    TracksUiState.Success(
+                        tracks = (_uiState.value as TracksUiState.Success).tracks,
+                        currentTrack = getCurrentTrack(),
+                        isPlay = isPlaying(),
+                        isLoadingNext = true
+                    )
+                }
+
+                runCatching { repository.loadNext() }
+                    .onSuccess { tracks ->
+                        if (tracks.isNotEmpty()) {
+                            _uiState.update {
+                                TracksUiState.Success(
+                                    tracks = tracks,
+                                    currentTrack = getCurrentTrack(),
+                                    isPlay = isPlaying(),
+                                    isLoadingNext = false
+                                )
+                            }
+                        } else {
+                            _uiState.update { TracksUiState.Empty }
+                        }
+                    }
+                    .onFailure { error ->
+                        _uiState.update { TracksUiState.Error(error.message) }
+                    }
             }
         }
     }
@@ -86,26 +139,28 @@ class LocalTracksScreenViewModel @Inject constructor(
 
         viewModelScope.launch {
             musicPlayer.isPlaying.collect { _ ->
-                updatePlayPause()
+                updatePlayingState()
             }
         }
     }
 
     private fun updateCurrentTrack() {
-        val currentState = _uiState.value
-        if (currentState is TracksUiState.Success) {
-            _uiState.value = currentState.copy(
-                currentTrack = getCurrentTrack()
-            ).also { println(getCurrentTrack()) }
+        _uiState.update { currentState ->
+            if (currentState is TracksUiState.Success) {
+                currentState.copy(currentTrack = getCurrentTrack())
+            } else {
+                currentState
+            }
         }
     }
 
-    private fun updatePlayPause() {
-        val currentState = _uiState.value
-        if (currentState is TracksUiState.Success) {
-            _uiState.value = currentState.copy(
-                isPlay = musicPlayer.isPlaying.value
-            ).also { println(currentState.isPlay) }
+    private fun updatePlayingState() {
+        _uiState.update { currentState ->
+            if (currentState is TracksUiState.Success) {
+                currentState.copy(isPlay = musicPlayer.isPlaying.value)
+            } else {
+                currentState
+            }
         }
     }
 
@@ -113,12 +168,11 @@ class LocalTracksScreenViewModel @Inject constructor(
         return musicPlayer.tracks.value.getOrNull(musicPlayer.currentIndex.value)
     }
 
-    private fun getPlayPause(): Boolean {
+    private fun isPlaying(): Boolean {
         return musicPlayer.isPlaying.value
     }
 
-    fun playPause() {
-        Log.d("PLAY_PAUSE", "CALLED")
+    fun changePlayingState() {
         if (musicPlayer.isPlaying.value) musicPlayer.pause()
         else musicPlayer.play()
     }

@@ -87,7 +87,9 @@ class MusicViewModel @Inject constructor(
     }
 
     fun seekTo(newPosition: Long) {
-        _uiState.update { it.copy(progress = newPosition.toFloat() / (_uiState.value.duration.takeIf { it > 0 } ?: 1)) }
+        _uiState.update { currentState ->
+            currentState.copy(progress = newPosition.toFloat() / (_uiState.value.duration.takeIf { it > 0 } ?: 1))
+        }
         musicPlayer.seekTo(newPosition)
     }
 }

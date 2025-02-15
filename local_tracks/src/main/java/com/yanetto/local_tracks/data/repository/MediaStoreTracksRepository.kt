@@ -2,12 +2,12 @@ package com.yanetto.local_tracks.data.repository
 import android.content.Context
 import android.net.Uri
 import android.provider.MediaStore
+import android.util.Log
 import com.yanetto.common_model.model.Track
 import com.yanetto.common_model.repository.TracksRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import javax.inject.Inject
+import kotlin.coroutines.cancellation.CancellationException
 
 class MediaStoreTracksRepository @Inject constructor(
     @ApplicationContext private val context: Context
@@ -15,32 +15,58 @@ class MediaStoreTracksRepository @Inject constructor(
 
     companion object {
         private const val PAGE_SIZE = 25
+        const val TAG = "MEDIA_STORE_REPOSITORY"
     }
 
     private var lastOffset = 0
     private val cachedTracks = mutableListOf<Track>()
 
-    override suspend fun getTracks(): List<Track> = withContext(Dispatchers.IO) {
-        cachedTracks.clear()
-        lastOffset = 0
-        val newTracks = queryTracks(limit = PAGE_SIZE, offset = lastOffset)
-        cachedTracks.addAll(newTracks)
-        cachedTracks
+    override suspend fun getTracks(): List<Track> {
+        return try {
+            cachedTracks.clear()
+            lastOffset = 0
+            val newTracks = queryTracks(limit = PAGE_SIZE, offset = lastOffset)
+            cachedTracks.addAll(newTracks)
+            cachedTracks
+        } catch (cancellationException: CancellationException) {
+            Log.e(TAG, cancellationException.stackTraceToString())
+            cachedTracks
+        } catch (e: Exception) {
+            Log.d(TAG, e.stackTraceToString())
+            throw e
+        }
+
     }
 
-    override suspend fun searchTracks(query: String): List<Track> = withContext(Dispatchers.IO) {
-        cachedTracks.clear()
-        lastOffset = 0
-        val newTracks = queryTracks(searchQuery = query, limit = PAGE_SIZE, offset = lastOffset)
-        cachedTracks.addAll(newTracks)
-        cachedTracks
+    override suspend fun searchTracks(query: String): List<Track> {
+        return try {
+            cachedTracks.clear()
+            lastOffset = 0
+            val newTracks = queryTracks(searchQuery = query, limit = PAGE_SIZE, offset = lastOffset)
+            cachedTracks.addAll(newTracks)
+            cachedTracks
+        } catch (cancellationException: CancellationException) {
+            Log.e(TAG, cancellationException.stackTraceToString())
+            cachedTracks
+        } catch (e: Exception) {
+            Log.d(TAG, e.stackTraceToString())
+            throw e
+        }
     }
 
-    suspend fun loadNext(): List<Track> = withContext(Dispatchers.IO) {
-        lastOffset += PAGE_SIZE
-        val newTracks = queryTracks(limit = PAGE_SIZE, offset = lastOffset)
-        cachedTracks.addAll(newTracks)
-        cachedTracks
+    suspend fun loadNext(): List<Track> {
+        return try {
+            lastOffset += PAGE_SIZE
+            val newTracks = queryTracks(limit = PAGE_SIZE, offset = lastOffset)
+            cachedTracks.addAll(newTracks)
+            cachedTracks
+        } catch (cancellationException: CancellationException) {
+            Log.e(TAG, cancellationException.stackTraceToString())
+            cachedTracks
+        } catch (e: Exception) {
+            Log.d(TAG, e.stackTraceToString())
+            throw e
+        }
     }
 
     private fun queryTracks(searchQuery: String? = null, limit: Int, offset: Int): List<Track> {

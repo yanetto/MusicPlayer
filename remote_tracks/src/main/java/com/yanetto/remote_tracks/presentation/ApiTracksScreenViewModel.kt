@@ -7,10 +7,12 @@ import com.yanetto.common_tracks.presentation.TracksUiState
 import com.yanetto.music_player.domain.MusicPlayerController
 import com.yanetto.remote_tracks.data.repository.ApiRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -31,36 +33,89 @@ class ApiTracksScreenViewModel @Inject constructor(
     }
 
     fun loadTracks() {
-        viewModelScope.launch {
-            _uiState.value = TracksUiState.Loading
-            runCatching {
-                repository.getTracks()
-            }.onSuccess { tracks ->
-                if (tracks.isNotEmpty()) {
-                    _uiState.value = TracksUiState.Success(tracks, getCurrentTrack())
-                } else {
-                    _uiState.value = TracksUiState.Empty
+        viewModelScope.launch(Dispatchers.IO) {
+
+            _uiState.update { TracksUiState.Loading }
+
+            runCatching { repository.getTracks() }
+                .onSuccess { tracks ->
+                    if (tracks.isNotEmpty()) {
+                        _uiState.update {
+                            TracksUiState.Success(
+                                tracks = tracks,
+                                currentTrack = getCurrentTrack(),
+                                isPlay = isPlaying(),
+                                isLoadingNext = false
+                            )
+                        }
+                    } else {
+                        _uiState.update { TracksUiState.Empty }
+                    }
                 }
-            }.onFailure { error ->
-                _uiState.value = TracksUiState.Error(error.message)
-            }
+                .onFailure { error ->
+                    _uiState.update { TracksUiState.Error(error.message) }
+                }
         }
     }
 
     fun searchTracks(query: String) {
         searchJob?.cancel()
-        searchJob = viewModelScope.launch {
-            _uiState.value = TracksUiState.Loading
-            runCatching {
-                repository.searchTracks(query)
-            }.onSuccess { tracks ->
-                if (tracks.isNotEmpty()) {
-                    _uiState.value = TracksUiState.Success(tracks, getCurrentTrack())
-                } else {
-                    _uiState.value = TracksUiState.Empty
+        searchJob = viewModelScope.launch(Dispatchers.IO) {
+
+            _uiState.update { TracksUiState.Loading }
+
+            runCatching { repository.searchTracks(query) }
+                .onSuccess { tracks ->
+                    if (tracks.isNotEmpty()) {
+                        _uiState.update {
+                            TracksUiState.Success(
+                                tracks = tracks,
+                                currentTrack = getCurrentTrack(),
+                                isPlay = isPlaying(),
+                                isLoadingNext = false
+                            )
+                        }
+                    } else {
+                        _uiState.update { TracksUiState.Empty }
+                    }
                 }
-            }.onFailure { error ->
-                _uiState.value = TracksUiState.Error(error.message)
+                .onFailure { error ->
+                    _uiState.update { TracksUiState.Error(error.message) }
+                }
+        }
+    }
+
+    fun loadNext() {
+        viewModelScope.launch(Dispatchers.IO) {
+            if (!(_uiState.value as TracksUiState.Success).isLoadingNext) {
+
+                _uiState.update {
+                    TracksUiState.Success(
+                        tracks = (_uiState.value as TracksUiState.Success).tracks,
+                        currentTrack = getCurrentTrack(),
+                        isPlay = isPlaying(),
+                        isLoadingNext = true
+                    )
+                }
+
+                runCatching { repository.loadNext() }
+                    .onSuccess { tracks ->
+                        if (tracks.isNotEmpty()) {
+                            _uiState.update {
+                                TracksUiState.Success(
+                                    tracks = tracks,
+                                    currentTrack = getCurrentTrack(),
+                                    isPlay = isPlaying(),
+                                    isLoadingNext = false
+                                )
+                            }
+                        } else {
+                            _uiState.update { TracksUiState.Empty }
+                        }
+                    }
+                    .onFailure { error ->
+                        _uiState.update { TracksUiState.Error(error.message) }
+                    }
             }
         }
     }
@@ -75,16 +130,50 @@ class ApiTracksScreenViewModel @Inject constructor(
                 updateCurrentTrack()
             }
         }
+
+        viewModelScope.launch {
+            musicPlayer.tracks.collect { _ ->
+                updateCurrentTrack()
+            }
+        }
+
+        viewModelScope.launch {
+            musicPlayer.isPlaying.collect { _ ->
+                updatePlayingState()
+            }
+        }
     }
 
     private fun updateCurrentTrack() {
-        val currentState = _uiState.value
-        if (currentState is TracksUiState.Success) {
-            _uiState.value = currentState.copy(currentTrack = getCurrentTrack())
+        _uiState.update { currentState ->
+            if (currentState is TracksUiState.Success) {
+                currentState.copy(currentTrack = getCurrentTrack())
+            } else {
+                currentState
+            }
+        }
+    }
+
+    private fun updatePlayingState() {
+        _uiState.update { currentState ->
+            if (currentState is TracksUiState.Success) {
+                currentState.copy(isPlay = musicPlayer.isPlaying.value)
+            } else {
+                currentState
+            }
         }
     }
 
     private fun getCurrentTrack(): Track? {
         return musicPlayer.tracks.value.getOrNull(musicPlayer.currentIndex.value)
+    }
+
+    private fun isPlaying(): Boolean {
+        return musicPlayer.isPlaying.value
+    }
+
+    fun changePlayingState() {
+        if (musicPlayer.isPlaying.value) musicPlayer.pause()
+        else musicPlayer.play()
     }
 }

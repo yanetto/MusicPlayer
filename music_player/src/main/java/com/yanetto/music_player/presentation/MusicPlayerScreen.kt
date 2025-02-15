@@ -3,11 +3,13 @@ package com.yanetto.music_player.presentation
 import androidx.annotation.OptIn
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import coil.compose.AsyncImage
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -33,86 +35,40 @@ fun MusicPlayerScreen(
 ) {
     val musicPlayerState by viewModel.uiState.collectAsState()
 
+    var sliderPosition by remember { mutableFloatStateOf(musicPlayerState.progress) }
+
+    LaunchedEffect(musicPlayerState.progress) {
+        if (sliderPosition != musicPlayerState.progress) {
+            sliderPosition = musicPlayerState.progress
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .animateContentSize()
-            .padding(horizontal = 16.dp, vertical = 16.dp),
+            .padding(horizontal = 16.dp, vertical = 16.dp)
+            .background(MaterialTheme.colorScheme.background),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        val image = musicPlayerState.currentTrack?.mediaMetadata?.artworkUri
+        BackButton(navigateBack)
 
-        Row(
-            modifier = Modifier.weight(0.5f).fillMaxWidth(),
-            horizontalArrangement = Arrangement.Start
-        ) {
-            IconButton(onClick = { navigateBack() }) {
-                Icon(
-                    painter = painterResource(R.drawable.back),
-                    contentDescription = stringResource(R.string.close),
-                    modifier = Modifier.size(40.dp)
-                )
-            }
-
-        }
-
-        Box(
-            modifier = Modifier.padding(horizontal = 16.dp).weight(3f),
-            contentAlignment = Alignment.Center
-        ) {
-            if (image != null) {
-                AsyncImage(
-                    model = image,
-                    contentDescription = stringResource(R.string.album_cover),
-                    modifier = Modifier
-                        .size(350.dp)
-                        .clip(RoundedCornerShape(8.dp)),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Image(
-                    painter = painterResource(R.drawable.default_album_cover),
-                    contentDescription = stringResource(R.string.album_cover),
-                    modifier = Modifier
-                        .size(350.dp)
-                        .clip(RoundedCornerShape(8.dp)),
-                    contentScale = ContentScale.Crop
-                )
-            }
-        }
+        AlbumCover(musicPlayerState.currentTrack?.mediaMetadata?.artworkUri.toString())
 
         Spacer(modifier = Modifier.weight(0.4f))
 
-        Text(
-            text = musicPlayerState.currentTrack?.mediaMetadata?.title.toString(),
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 16.dp).weight(0.2f)
-        )
-        Text(
-            text = musicPlayerState.currentTrack?.mediaMetadata?.artist.toString(),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 16.dp).weight(0.2f)
+        TrackDetails(
+            title = musicPlayerState.currentTrack?.mediaMetadata?.title.toString(),
+            artist = musicPlayerState.currentTrack?.mediaMetadata?.artist.toString()
         )
 
         Spacer(modifier = Modifier.weight(0.4f))
-
-
-        var sliderPosition by remember { mutableFloatStateOf(musicPlayerState.progress) }
-
-        LaunchedEffect(musicPlayerState.progress) {
-            if (sliderPosition != musicPlayerState.progress) {
-                sliderPosition = musicPlayerState.progress
-            }
-        }
 
         Slider(
             value = sliderPosition,
             onValueChange = { newProgress ->
-                viewModel.updateSliderMoving(true)
                 sliderPosition = newProgress
+                viewModel.updateSliderMoving(true)
             },
             onValueChangeFinished = {
                 viewModel.updateSliderMoving(false)
@@ -125,67 +81,161 @@ fun MusicPlayerScreen(
                 .weight(0.5f)
         )
 
+        TrackTimeDisplay(
+            currentTime = (sliderPosition * musicPlayerState.duration).toLong(),
+            duration = musicPlayerState.duration
+        )
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .weight(0.5f)
-            ,
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                formatTime((sliderPosition * musicPlayerState.duration).toLong()),
-                modifier = Modifier.padding(end = 8.dp)
+        PlaybackControls(
+            isPlaying = musicPlayerState.isPlaying,
+            onPlayPause = { if (musicPlayerState.isPlaying) viewModel.pause() else viewModel.play() },
+            onNext = { viewModel.nextTrack() },
+            onPrev = { viewModel.prevTrack() },
+            isPrevEnabled = musicPlayerState.currentIndex != 0,
+            isNextEnabled = musicPlayerState.currentIndex != musicPlayerState.tracks.size - 1
+        )
+    }
+}
+
+
+@Composable
+fun ColumnScope.BackButton(navigateBack: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .weight(0.5f)
+            .fillMaxWidth(),
+        horizontalArrangement = Arrangement.Start
+    ) {
+        IconButton(onClick = { navigateBack() }) {
+            Icon(
+                painter = painterResource(R.drawable.back),
+                contentDescription = stringResource(R.string.close),
+                modifier = Modifier.size(40.dp)
             )
-
-            Text(formatTime(musicPlayerState.duration), modifier = Modifier.padding(start = 8.dp))
-        }
-
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .weight(1f),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(
-                onClick = { viewModel.prevTrack() },
-                enabled = musicPlayerState.currentIndex != 0
-            ) {
-                Icon(
-                    painter = painterResource(R.drawable.skip_previous),
-                    contentDescription = stringResource(R.string.previous_track),
-                    modifier = Modifier.size(40.dp)
-                )
-            }
-            IconButton(onClick = {
-                if (musicPlayerState.isPlaying) viewModel.pause() else viewModel.play()
-            }) {
-                Icon(
-                    painter = if (musicPlayerState.isPlaying) painterResource(R.drawable.pause) else painterResource(
-                        R.drawable.play
-                    ),
-                    contentDescription = stringResource(R.string.play_pause),
-                    modifier = Modifier.size(40.dp)
-                )
-            }
-            IconButton(
-                onClick = { viewModel.nextTrack() },
-                enabled = musicPlayerState.currentIndex != musicPlayerState.tracks.size - 1
-            ) {
-                Icon(
-                    painter = painterResource(R.drawable.skip_next),
-                    contentDescription = stringResource(R.string.next_track),
-                    modifier = Modifier.size(40.dp)
-                )
-            }
         }
     }
 }
+
+
+@Composable
+fun ColumnScope.AlbumCover(imageUri: String?) {
+    Box(
+        modifier = Modifier
+            .padding(horizontal = 16.dp)
+            .weight(3f),
+        contentAlignment = Alignment.Center
+    ) {
+        if (imageUri != null) {
+            AsyncImage(
+                model = imageUri,
+                contentDescription = stringResource(R.string.album_cover),
+                modifier = Modifier
+                    .size(350.dp)
+                    .clip(RoundedCornerShape(8.dp)),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Image(
+                painter = painterResource(R.drawable.default_album_cover),
+                contentDescription = stringResource(R.string.album_cover),
+                modifier = Modifier
+                    .size(350.dp)
+                    .clip(RoundedCornerShape(8.dp)),
+                contentScale = ContentScale.Crop
+            )
+        }
+    }
+}
+
+@Composable
+fun ColumnScope.TrackDetails(title: String?, artist: String?) {
+    Text(
+        text = title.orEmpty(),
+        fontWeight = FontWeight.Bold,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier
+            .padding(horizontal = 16.dp)
+            .weight(0.2f)
+    )
+    Text(
+        text = artist.orEmpty(),
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier
+            .padding(horizontal = 16.dp)
+            .weight(0.2f)
+    )
+}
+
+@Composable
+fun ColumnScope.TrackTimeDisplay(currentTime: Long, duration: Long) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .weight(0.5f),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            formatTime(currentTime),
+            modifier = Modifier.padding(end = 8.dp)
+        )
+
+        Text(formatTime(duration), modifier = Modifier.padding(start = 8.dp))
+    }
+}
+
+@Composable
+fun ColumnScope.PlaybackControls(
+    isPlaying: Boolean,
+    onPlayPause: () -> Unit,
+    onNext: () -> Unit,
+    onPrev: () -> Unit,
+    isPrevEnabled: Boolean,
+    isNextEnabled: Boolean
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .weight(1f),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(
+            onClick = { onPrev() },
+            enabled = isPrevEnabled
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.skip_previous),
+                contentDescription = stringResource(R.string.previous_track),
+                modifier = Modifier.size(40.dp)
+            )
+        }
+
+        IconButton(onClick = onPlayPause) {
+            Icon(
+                painter = if (isPlaying) painterResource(R.drawable.pause) else painterResource(R.drawable.play),
+                contentDescription = stringResource(R.string.play_pause),
+                modifier = Modifier.size(40.dp)
+            )
+        }
+
+        IconButton(
+            onClick = { onNext() },
+            enabled = isNextEnabled
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.skip_next),
+                contentDescription = stringResource(R.string.next_track),
+                modifier = Modifier.size(40.dp)
+            )
+        }
+    }
+}
+
 
 fun formatTime(ms: Long): String {
     val minutes = TimeUnit.MILLISECONDS.toMinutes(ms)

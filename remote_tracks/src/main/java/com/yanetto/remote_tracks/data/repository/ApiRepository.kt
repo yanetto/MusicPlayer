@@ -5,6 +5,7 @@ import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFact
 import com.yanetto.common_model.model.Track
 import com.yanetto.common_model.repository.TracksRepository
 import com.yanetto.remote_tracks.domain.network.Api
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import retrofit2.Retrofit
@@ -52,8 +53,11 @@ class ApiRepository @Inject constructor(
             val newTracks = response.data.map { it.toTrack() }
             cachedTracks.addAll(newTracks)
             cachedTracks
+        } catch (cancellationException: CancellationException) {
+            Log.e(TAG, cancellationException.stackTraceToString())
+            cachedTracks
         } catch (e: Exception) {
-            Log.e(TAG, e.stackTraceToString())
+            Log.d(TAG, e.stackTraceToString())
             throw e
         }
     }
@@ -69,6 +73,9 @@ class ApiRepository @Inject constructor(
 
             cachedTracks.addAll(newTracks)
 
+            cachedTracks
+        } catch (cancellationException: CancellationException) {
+            Log.e(TAG, cancellationException.stackTraceToString())
             cachedTracks
         } catch (e: Exception) {
             Log.d(TAG, e.stackTraceToString())

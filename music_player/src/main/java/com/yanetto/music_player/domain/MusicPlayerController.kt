@@ -21,6 +21,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -49,7 +50,7 @@ class MusicPlayerController @Inject constructor(
     init {
         startMusicService()
         initializeMediaController()
-        startProgressUpdater()
+        updateProgress()
     }
 
     private fun initializeMediaController() {
@@ -66,31 +67,31 @@ class MusicPlayerController @Inject constructor(
 
     private val playerListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
-            _isPlaying.value = playbackState == Player.STATE_READY && mediaController?.playWhenReady == true
+            _isPlaying.update { playbackState == Player.STATE_READY && mediaController?.playWhenReady == true }
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-            _currentIndex.value = mediaController?.currentMediaItemIndex ?: 0
-            updateDurationWithRetry()
+            _currentIndex.update { mediaController?.currentMediaItemIndex ?: 0 }
+            updateDuration()
         }
 
         override fun onEvents(player: Player, events: Player.Events) {
             if (player.playbackState == Player.STATE_READY) {
-                _isPlaying.value = player.isPlaying
+                _isPlaying.update { player.isPlaying }
             }
-            _currentIndex.value = player.currentMediaItemIndex
-            updateDurationWithRetry()
+            _currentIndex.update { player.currentMediaItemIndex }
+            updateDuration()
         }
 
     }
 
-    private fun startProgressUpdater() {
+    private fun updateProgress() {
         scope.launch {
             while (true) {
                 if (_isPlaying.value && !_isSliderMoving.value) {
                     val currentPosition = mediaController?.currentPosition ?: 0L
                     val trackDuration = _duration.value.takeIf { it > 0 } ?: 1L
-                    _progress.value = currentPosition.toFloat() / trackDuration
+                    _progress.update { currentPosition.toFloat() / trackDuration }
                 }
                 delay(200)
             }
@@ -103,8 +104,8 @@ class MusicPlayerController @Inject constructor(
             else play()
             return
         }
-        _tracks.value = playlist
-        _currentIndex.value = startIndex
+        _tracks.update { playlist }
+        _currentIndex.update { startIndex }
 
         mediaController?.apply {
             setMediaItems(playlist.toMediaItemList())
@@ -116,7 +117,7 @@ class MusicPlayerController @Inject constructor(
 
     private fun playTrack(index: Int) {
         if (index in _tracks.value.indices) {
-            _currentIndex.value = index
+            _currentIndex.update { index }
             mediaController?.seekTo(index, 0)
             mediaController?.play()
         }
@@ -138,24 +139,24 @@ class MusicPlayerController @Inject constructor(
     fun pause() = mediaController?.pause()
 
     fun seekTo(position: Long) {
-        _isSliderMoving.value = false
+        _isSliderMoving.update { false }
         mediaController?.seekTo(position)
         val trackDuration = _duration.value.takeIf { it > 0 } ?: 1L
-        _progress.value = position.toFloat() / trackDuration
+        _progress.update { position.toFloat() / trackDuration }
     }
 
     fun updateSliderMoving(isMoving: Boolean) {
-        _isSliderMoving.value = isMoving
+        _isSliderMoving.update { isMoving }
     }
 
-    private fun updateDurationWithRetry() {
+    private fun updateDuration() {
         scope.launch {
             var newDuration = mediaController?.duration ?: C.TIME_UNSET
             if (newDuration == C.TIME_UNSET) {
                 delay(200)
                 newDuration = mediaController?.duration ?: 0L
             }
-            _duration.value = maxOf(newDuration, 0L)
+            _duration.update { maxOf(newDuration, 0L) }
         }
     }
 

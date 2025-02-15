@@ -27,6 +27,7 @@ fun LocalTracksScreen(
             )
         },
         navigateToPlayer = navigateToPlayer,
-        onPlayPauseClick = { viewModel.playPause() }
+        onPlayPauseClick = { viewModel.changePlayingState() },
+        loadNext = { viewModel.loadNext() }
     )
 }

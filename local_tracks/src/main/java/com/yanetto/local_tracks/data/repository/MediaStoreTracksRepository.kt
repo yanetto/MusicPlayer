@@ -13,15 +13,37 @@ class MediaStoreTracksRepository @Inject constructor(
     @ApplicationContext private val context: Context
 ) : TracksRepository {
 
+    companion object {
+        private const val PAGE_SIZE = 25
+    }
+
+    private var lastOffset = 0
+    private val cachedTracks = mutableListOf<Track>()
+
     override suspend fun getTracks(): List<Track> = withContext(Dispatchers.IO) {
-        queryTracks()
+        cachedTracks.clear()
+        lastOffset = 0
+        val newTracks = queryTracks(limit = PAGE_SIZE, offset = lastOffset)
+        cachedTracks.addAll(newTracks)
+        cachedTracks
     }
 
     override suspend fun searchTracks(query: String): List<Track> = withContext(Dispatchers.IO) {
-        queryTracks(query)
+        cachedTracks.clear()
+        lastOffset = 0
+        val newTracks = queryTracks(searchQuery = query, limit = PAGE_SIZE, offset = lastOffset)
+        cachedTracks.addAll(newTracks)
+        cachedTracks
     }
 
-    private fun queryTracks(searchQuery: String? = null): List<Track> {
+    suspend fun loadNext(): List<Track> = withContext(Dispatchers.IO) {
+        lastOffset += PAGE_SIZE
+        val newTracks = queryTracks(limit = PAGE_SIZE, offset = lastOffset)
+        cachedTracks.addAll(newTracks)
+        cachedTracks
+    }
+
+    private fun queryTracks(searchQuery: String? = null, limit: Int, offset: Int): List<Track> {
         val tracks = mutableListOf<Track>()
         val contentResolver = context.contentResolver
 
@@ -40,11 +62,7 @@ class MediaStoreTracksRepository @Inject constructor(
                     "(${MediaStore.Audio.Media.TITLE} LIKE ? OR ${MediaStore.Audio.Media.ARTIST} LIKE ?)"
         }
 
-        val selectionArgs = if (searchQuery.isNullOrBlank()) {
-            null
-        } else {
-            arrayOf("%$searchQuery%", "%$searchQuery%")
-        }
+        val selectionArgs = searchQuery?.let { arrayOf("%$searchQuery%", "%$searchQuery%") }
 
         val sortOrder = "${MediaStore.Audio.Media.DATE_ADDED} DESC"
 
@@ -52,22 +70,20 @@ class MediaStoreTracksRepository @Inject constructor(
             MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
             projection, selection, selectionArgs, sortOrder
         )?.use { cursor ->
-            val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
-            val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
-            val artistColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
-            val dataColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
-            val albumIdColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID)
+            if (cursor.moveToPosition(offset)) {
+                var count = 0
+                do {
+                    val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID))
+                    val name = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE))
+                    val artist = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST))
+                    val filePath = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA))
+                    val albumId = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID))
 
-            while (cursor.moveToNext()) {
-                val id = cursor.getLong(idColumn)
-                val name = cursor.getString(nameColumn)
-                val artist = cursor.getString(artistColumn)
-                val filePath = cursor.getString(dataColumn)
-                val albumId = cursor.getLong(albumIdColumn)
+                    val albumCoverUri = getAlbumArtUri(albumId)
 
-                val albumCoverUri = getAlbumArtUri(albumId)
-
-                tracks.add(Track(id, name, artist, filePath, albumCoverUri))
+                    tracks.add(Track(id, name, artist, filePath, albumCoverUri))
+                    count++
+                } while (cursor.moveToNext() && count < limit)
             }
         }
         return tracks

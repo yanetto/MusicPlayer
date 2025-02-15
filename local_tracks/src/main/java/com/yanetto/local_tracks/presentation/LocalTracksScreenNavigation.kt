@@ -5,6 +5,9 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -21,7 +24,11 @@ const val LOCAL_TRACKS_ROUTE = "local_tracks_screen"
 fun NavGraphBuilder.localTracksScreen(
     navigateToPlayer: () -> Unit
 ) {
-    composable(route = LOCAL_TRACKS_ROUTE) {
+    composable(
+        route = LOCAL_TRACKS_ROUTE,
+        enterTransition = { fadeIn(animationSpec = tween(durationMillis = 1200)) },
+        exitTransition = { fadeOut(animationSpec = tween(durationMillis = 800)) }
+    ) {
         var permissionGranted by remember { mutableStateOf(false) }
 
         RequestStoragePermission(onPermissionGranted = {

@@ -37,6 +37,8 @@ android {
 
 dependencies {
     implementation(project(":common_model"))
+    implementation(project(":common_tracks"))
+    implementation(project(":music_player"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -44,6 +46,7 @@ dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
+    implementation(libs.androidx.material3)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
 
@@ -51,8 +54,7 @@ dependencies {
     implementation(libs.androidx.navigation.runtime.ktx)
 
     implementation(libs.hilt.android)
-    implementation(project(":common_tracks"))
-    implementation(project(":music_player"))
+
     kapt(libs.hilt.android.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
 

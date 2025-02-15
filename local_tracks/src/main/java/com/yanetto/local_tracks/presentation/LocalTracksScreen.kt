@@ -26,6 +26,7 @@ fun LocalTracksScreen(
                 it
             )
         },
-        navigateToPlayer = navigateToPlayer
+        navigateToPlayer = navigateToPlayer,
+        onPlayPauseClick = { viewModel.playPause() }
     )
 }

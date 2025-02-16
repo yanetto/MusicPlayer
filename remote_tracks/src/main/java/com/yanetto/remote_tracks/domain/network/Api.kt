@@ -6,7 +6,7 @@ import retrofit2.http.GET
 import retrofit2.http.Query
 import retrofit2.http.Url
 
-interface Api {
+internal interface Api {
     @GET("chart")
     suspend fun getChart(): ChartResponse
 

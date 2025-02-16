@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class Album (
+internal data class Album(
     @SerialName("cover_big") val cover: String,
     val title: String?
 )

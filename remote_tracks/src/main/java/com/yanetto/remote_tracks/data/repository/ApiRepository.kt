@@ -12,7 +12,7 @@ import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import javax.inject.Inject
 
-class ApiRepository @Inject constructor(
+internal class ApiRepository @Inject constructor(
     okHttpClient: OkHttpClient
 ) : TracksRepository {
 

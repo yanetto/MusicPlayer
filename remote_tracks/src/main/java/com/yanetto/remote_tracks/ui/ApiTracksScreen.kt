@@ -1,4 +1,4 @@
-package com.yanetto.remote_tracks.presentation
+package com.yanetto.remote_tracks.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -9,7 +9,7 @@ import com.yanetto.common_tracks.presentation.TracksScreen
 import com.yanetto.common_tracks.presentation.TracksUiState
 
 @Composable
-fun ApiTracksScreen(
+internal fun ApiTracksScreen(
     modifier: Modifier = Modifier,
     navigateToPlayer: () -> Unit,
     viewModel: ApiTracksScreenViewModel = hiltViewModel()

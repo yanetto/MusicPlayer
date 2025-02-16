@@ -28,6 +28,12 @@ open class TracksScreenViewModel(
         observeCurrentTrack()
     }
 
+    fun notStarted() {
+        _uiState.update {
+            TracksUiState.NotStarted
+        }
+    }
+
     fun loadTracks() {
         viewModelScope.launch(Dispatchers.IO) {
 

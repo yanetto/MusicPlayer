@@ -1,4 +1,4 @@
-package com.yanetto.music_player.presentation
+package com.yanetto.music_player.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -26,7 +26,7 @@ data class MusicPlayerState(
 )
 
 @HiltViewModel
-class MusicViewModel @Inject constructor(
+internal class MusicViewModel @Inject constructor(
     private val musicPlayer: MusicPlayerController
 ) : ViewModel() {
 

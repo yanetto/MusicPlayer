@@ -1,4 +1,4 @@
-package com.yanetto.music_player.presentation
+package com.yanetto.music_player.ui
 
 import android.net.Uri
 import androidx.annotation.OptIn
@@ -45,7 +45,7 @@ import java.util.concurrent.TimeUnit
 
 @OptIn(UnstableApi::class)
 @Composable
-fun MusicPlayerScreen(
+internal fun MusicPlayerScreen(
     viewModel: MusicViewModel = hiltViewModel(),
     navigateBack: () -> Unit
 ) {

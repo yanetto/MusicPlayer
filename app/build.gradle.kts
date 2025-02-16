@@ -21,6 +21,10 @@ android {
         signingConfig = signingConfigs.getByName("debug")
     }
 
+    lint {
+        baseline = file("lint-baseline.xml")
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false

@@ -9,7 +9,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import kotlin.coroutines.cancellation.CancellationException
 
-class MediaStoreTracksRepository @Inject constructor(
+internal class MediaStoreTracksRepository @Inject constructor(
     @ApplicationContext private val context: Context
 ) : TracksRepository {
 

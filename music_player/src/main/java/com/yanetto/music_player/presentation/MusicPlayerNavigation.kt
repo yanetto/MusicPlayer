@@ -6,6 +6,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
+import com.yanetto.music_player.ui.MusicPlayerScreen
 
 const val MUSIC_PLAYER_ROUTE = "player_screen"
 

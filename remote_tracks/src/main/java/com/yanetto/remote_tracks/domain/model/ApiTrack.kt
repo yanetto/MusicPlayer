@@ -5,7 +5,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class ApiTrack (
+internal data class ApiTrack(
     val id: Long,
     val title: String,
     @SerialName("preview") val mediaUri: String,

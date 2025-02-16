@@ -1,4 +1,4 @@
-package com.yanetto.remote_tracks.presentation
+package com.yanetto.remote_tracks.ui
 
 import com.yanetto.common_tracks.presentation.TracksScreenViewModel
 import com.yanetto.music_player.domain.MusicPlayerController
@@ -7,7 +7,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 
 @HiltViewModel
-class ApiTracksScreenViewModel @Inject constructor(
+internal class ApiTracksScreenViewModel @Inject constructor(
     repository: ApiRepository,
     musicPlayer: MusicPlayerController
 ) : TracksScreenViewModel(repository, musicPlayer)

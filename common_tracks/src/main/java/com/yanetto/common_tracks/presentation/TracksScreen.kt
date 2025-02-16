@@ -1,6 +1,5 @@
 package com.yanetto.common_tracks.presentation
 
-import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -73,9 +72,9 @@ fun TracksScreen(
 
     LaunchedEffect(listState.firstVisibleItemIndex) {
         val lastVisibleIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index
+
         if (lastVisibleIndex != null) {
             if (listState.layoutInfo.totalItemsCount >= LIMIT && lastVisibleIndex >= listState.layoutInfo.totalItemsCount - DIFF) {
-                Log.d("LOAD_NEXT", listState.layoutInfo.totalItemsCount.toString() + " " + lastVisibleIndex)
                 loadNext()
             }
         }
@@ -101,10 +100,8 @@ fun TracksScreen(
         )
 
         when (uiState) {
-            is TracksUiState.Loading -> {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
+            is TracksUiState.Loading, is TracksUiState.NotStarted -> {
+                LoadingScreen()
             }
             is TracksUiState.Success -> {
                 Column(modifier = Modifier.fillMaxSize()) {
@@ -130,6 +127,7 @@ fun TracksScreen(
                             }
                         }
                     }
+
                     if ((uiState as? TracksUiState.Success)?.currentTrack != null) {
                         val track = (uiState as? TracksUiState.Success)?.currentTrack
                         val isPause = !(uiState as? TracksUiState.Success)?.isPlay!!
@@ -163,6 +161,13 @@ fun TracksScreen(
                 )
             }
         }
+    }
+}
+
+@Composable
+fun LoadingScreen() {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator()
     }
 }
 

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ask_permission_mediafiles">Предоставьте разрешение на доступ к медиафайлам на устройстве</string>
+    <string name="go_to_settings">Перейти в настройки</string>
+    <string name="i_gave_permission">Я дал разрешение</string>
+</resources>

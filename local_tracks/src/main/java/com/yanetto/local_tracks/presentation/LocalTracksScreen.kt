@@ -26,6 +26,7 @@ fun LocalTracksScreen(
                 it
             )
         },
+        isCurrentPlayingTrack = { viewModel.isCurrentPlayingTrack(it) },
         navigateToPlayer = navigateToPlayer,
         onPlayPauseClick = { viewModel.changePlayingState() },
         loadNext = { viewModel.loadNext() }

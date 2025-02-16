@@ -47,6 +47,8 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
 
+    implementation(libs.androidx.media3.common)
+
     implementation(libs.okhttp)
     implementation(libs.retrofit)
     implementation(libs.retrofit2.kotlinx.serialization.converter)

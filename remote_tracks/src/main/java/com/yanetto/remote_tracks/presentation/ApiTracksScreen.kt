@@ -28,6 +28,7 @@ fun ApiTracksScreen(
         },
         navigateToPlayer = navigateToPlayer,
         onPlayPauseClick = { viewModel.changePlayingState() },
-        loadNext = { viewModel.loadNext() }
+        loadNext = { viewModel.loadNext() },
+        isCurrentPlayingTrack = { viewModel.isCurrentPlayingTrack(it) }
     )
 }

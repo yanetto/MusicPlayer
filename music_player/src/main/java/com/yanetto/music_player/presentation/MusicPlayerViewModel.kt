@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
 import androidx.media3.session.MediaController
 import com.yanetto.music_player.domain.MusicPlayerController
-import com.yanetto.music_player.domain.toMediaItem
 import com.yanetto.music_player.domain.toMediaItemList
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,39 +38,24 @@ class MusicViewModel @Inject constructor(
 
     private fun observePlayerState() {
         viewModelScope.launch {
-            musicPlayer.tracks.collect { tracks ->
-                _uiState.update { it.copy(tracks = tracks.toMediaItemList()) }
-            }
-        }
-
-        viewModelScope.launch {
-            musicPlayer.currentIndex.collect { index ->
+            musicPlayer.playerState.collect { playerState ->
                 _uiState.update {
                     it.copy(
-                        currentIndex = index,
-                        currentTrack = musicPlayer.tracks.value.getOrNull(index)?.toMediaItem()
+                        currentIndex = playerState.currentIndex,
+                        currentTrack = playerState.currentMediaItem,
+                        tracks = playerState.tracks.toMediaItemList(),
+                        duration = playerState.duration,
+                        isPlaying = playerState.isPlaying
                     )
                 }
             }
         }
 
         viewModelScope.launch {
-            musicPlayer.progress.collect { progress ->
+            musicPlayer.playerState.collect { playerState ->
                 if (!_uiState.value.isSliderMoving) {
-                    _uiState.update { it.copy(progress = progress) }
+                    _uiState.update { it.copy(progress = playerState.progress) }
                 }
-            }
-        }
-
-        viewModelScope.launch {
-            musicPlayer.duration.collect { duration ->
-                _uiState.update { it.copy(duration = duration) }
-            }
-        }
-
-        viewModelScope.launch {
-            musicPlayer.isPlaying.collect { isPlaying ->
-                _uiState.update { it.copy(isPlaying = isPlaying) }
             }
         }
     }

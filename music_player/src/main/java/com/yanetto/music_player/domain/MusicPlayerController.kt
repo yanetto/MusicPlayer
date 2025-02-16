@@ -26,24 +26,24 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
+data class PlayerState (
+    val tracks: List<Track> = emptyList(),
+    val currentMediaItem: MediaItem? = null,
+    val currentIndex: Int = -1,
+    val isPlaying: Boolean = false,
+    val progress: Float = 0f,
+    val duration: Long = 0L,
+    val isSliderMoving: Boolean = false
+)
+
 @Singleton
 class MusicPlayerController @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     private var mediaController: MediaController? = null
 
-    private val _tracks = MutableStateFlow<List<Track>>(emptyList())
-    private val _currentIndex = MutableStateFlow(-1)
-    private val _isPlaying = MutableStateFlow(false)
-    private val _progress = MutableStateFlow(0f)
-    private val _duration = MutableStateFlow(0L)
-    private val _isSliderMoving = MutableStateFlow(false)
-
-    val tracks: StateFlow<List<Track>> = _tracks.asStateFlow()
-    val currentIndex: StateFlow<Int> = _currentIndex.asStateFlow()
-    val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
-    val progress: StateFlow<Float> = _progress.asStateFlow()
-    val duration: StateFlow<Long> = _duration.asStateFlow()
+    private val _playerState = MutableStateFlow(PlayerState())
+    val playerState: StateFlow<PlayerState> = _playerState.asStateFlow()
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
@@ -67,31 +67,38 @@ class MusicPlayerController @Inject constructor(
 
     private val playerListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
-            _isPlaying.update { playbackState == Player.STATE_READY && mediaController?.playWhenReady == true }
+            _playerState.update { it.copy(isPlaying = playbackState == Player.STATE_READY && mediaController?.playWhenReady == true) }
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-            _currentIndex.update { mediaController?.currentMediaItemIndex ?: 0 }
+            _playerState.update {
+                it.copy(
+                    currentIndex = mediaController?.currentMediaItemIndex ?: 0,
+                    currentMediaItem = mediaController?.currentMediaItem
+                ) }
             updateDuration()
         }
 
         override fun onEvents(player: Player, events: Player.Events) {
             if (player.playbackState == Player.STATE_READY) {
-                _isPlaying.update { player.isPlaying }
+                _playerState.update { it.copy(isPlaying = player.isPlaying) }
             }
-            _currentIndex.update { player.currentMediaItemIndex }
+            _playerState.update {
+                it.copy(
+                    currentIndex = player.currentMediaItemIndex,
+                    currentMediaItem = mediaController?.currentMediaItem
+                ) }
             updateDuration()
         }
-
     }
 
     private fun updateProgress() {
         scope.launch {
             while (true) {
-                if (_isPlaying.value && !_isSliderMoving.value) {
+                if (_playerState.value.isPlaying && !_playerState.value.isSliderMoving) {
                     val currentPosition = mediaController?.currentPosition ?: 0L
-                    val trackDuration = _duration.value.takeIf { it > 0 } ?: 1L
-                    _progress.update { currentPosition.toFloat() / trackDuration }
+                    val trackDuration = _playerState.value.duration.takeIf { it > 0 } ?: 1L
+                    _playerState.update { it.copy(progress = currentPosition.toFloat() / trackDuration) }
                 }
                 delay(200)
             }
@@ -99,13 +106,19 @@ class MusicPlayerController @Inject constructor(
     }
 
     fun setPlaylist(playlist: List<Track>, startIndex: Int = 0) {
-        if (playlist == _tracks.value && _currentIndex.value == startIndex) {
-            if (_isPlaying.value) pause()
+        if (playlist == _playerState.value.tracks && _playerState.value.currentIndex == startIndex) {
+            if (_playerState.value.isPlaying) pause()
             else play()
             return
         }
-        _tracks.update { playlist }
-        _currentIndex.update { startIndex }
+        _playerState.update {
+            it.copy(tracks = playlist.toList())
+        }
+        _playerState.update {
+            it.copy(
+                currentIndex = startIndex,
+                currentMediaItem = playlist[startIndex].toMediaItem()
+            ) }
 
         mediaController?.apply {
             setMediaItems(playlist.toMediaItemList())
@@ -116,22 +129,26 @@ class MusicPlayerController @Inject constructor(
     }
 
     private fun playTrack(index: Int) {
-        if (index in _tracks.value.indices) {
-            _currentIndex.update { index }
+        if (index in _playerState.value.tracks.indices) {
+            _playerState.update {
+                it.copy(
+                    currentIndex = index,
+                    currentMediaItem = _playerState.value.tracks[index].toMediaItem()
+                ) }
             mediaController?.seekTo(index, 0)
             mediaController?.play()
         }
     }
 
     fun nextTrack() {
-        if (_currentIndex.value < _tracks.value.lastIndex) {
-            playTrack(_currentIndex.value + 1)
+        if (_playerState.value.currentIndex < _playerState.value.tracks.lastIndex) {
+            playTrack(_playerState.value.currentIndex + 1)
         }
     }
 
     fun prevTrack() {
-        if (_currentIndex.value > 0) {
-            playTrack(_currentIndex.value - 1)
+        if (_playerState.value.currentIndex > 0) {
+            playTrack(_playerState.value.currentIndex - 1)
         }
     }
 
@@ -139,14 +156,14 @@ class MusicPlayerController @Inject constructor(
     fun pause() = mediaController?.pause()
 
     fun seekTo(position: Long) {
-        _isSliderMoving.update { false }
+        _playerState.update { it.copy(isSliderMoving = false) }
         mediaController?.seekTo(position)
-        val trackDuration = _duration.value.takeIf { it > 0 } ?: 1L
-        _progress.update { position.toFloat() / trackDuration }
+        val trackDuration = _playerState.value.duration.takeIf { it > 0 } ?: 1L
+        _playerState.update { it.copy(progress = position.toFloat() / trackDuration) }
     }
 
     fun updateSliderMoving(isMoving: Boolean) {
-        _isSliderMoving.update { isMoving }
+        _playerState.update { it.copy(isSliderMoving = isMoving) }
     }
 
     private fun updateDuration() {
@@ -156,7 +173,7 @@ class MusicPlayerController @Inject constructor(
                 delay(200)
                 newDuration = mediaController?.duration ?: 0L
             }
-            _duration.update { maxOf(newDuration, 0L) }
+            _playerState.update { it.copy(duration = maxOf(newDuration, 0L)) }
         }
     }
 

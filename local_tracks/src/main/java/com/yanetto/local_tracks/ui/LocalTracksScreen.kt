@@ -35,9 +35,6 @@ internal fun LocalTracksScreenCheckPermission(
     navigateToPlayer: () -> Unit
 ) {
     val permissionUiState by viewModel.permissionState.collectAsState()
-    val context = LocalContext.current
-
-    viewModel.checkPermission(context)
 
     RequestStoragePermission(
         onPermissionGranted = { viewModel.onPermissionResult(true) },

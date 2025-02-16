@@ -47,7 +47,7 @@ internal class LocalTracksScreenViewModel @Inject constructor(
                 permissionChecked = true
             )
         }
-        if (granted) notStarted()
+        if (granted) onRestart()
     }
 
     fun onPermissionResult(isGranted: Boolean) {
@@ -57,7 +57,7 @@ internal class LocalTracksScreenViewModel @Inject constructor(
                 permissionChecked = true
             )
         }
-        if (isGranted) notStarted()
+        if (isGranted) onRestart()
     }
 
     fun openAppSettings(context: Context) {

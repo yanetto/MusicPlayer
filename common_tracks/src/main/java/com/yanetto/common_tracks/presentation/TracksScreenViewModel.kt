@@ -28,7 +28,7 @@ open class TracksScreenViewModel(
         observeCurrentTrack()
     }
 
-    fun notStarted() {
+    fun onRestart() {
         _uiState.update {
             TracksUiState.NotStarted
         }

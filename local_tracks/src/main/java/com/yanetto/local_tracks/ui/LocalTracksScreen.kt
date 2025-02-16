@@ -37,13 +37,10 @@ internal fun LocalTracksScreenCheckPermission(
     val permissionUiState by viewModel.permissionState.collectAsState()
 
     RequestStoragePermission(
-        onPermissionGranted = { viewModel.onPermissionResult(true) },
-        onPermissionDenied = { viewModel.onPermissionResult(false) }
+        onPermissionResult = viewModel::onPermissionResult
     )
 
-    if (!permissionUiState.permissionChecked) {
-        Box(modifier = Modifier.fillMaxSize())
-    } else if (permissionUiState.permissionGranted) {
+    if (permissionUiState.permissionGranted) {
         LocalTracksScreen(navigateToPlayer = navigateToPlayer, viewModel = viewModel)
     } else {
         NoPermissionScreen({ viewModel.openAppSettings(it) }, { viewModel.checkPermission(it) })
@@ -52,18 +49,13 @@ internal fun LocalTracksScreenCheckPermission(
 
 @Composable
 fun RequestStoragePermission(
-    onPermissionGranted: () -> Unit,
-    onPermissionDenied: () -> Unit
+    onPermissionResult: (Boolean) -> Unit,
 ) {
     val context = LocalContext.current
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
-        if (isGranted) {
-            onPermissionGranted()
-        } else {
-            onPermissionDenied()
-        }
+        onPermissionResult(isGranted)
     }
 
     LaunchedEffect(Unit) {

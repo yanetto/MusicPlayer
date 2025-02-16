@@ -17,8 +17,7 @@ import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 
 data class PermissionUiState(
-    val permissionGranted: Boolean = false,
-    val permissionChecked: Boolean = false
+    val permissionGranted: Boolean = true
 )
 
 @HiltViewModel
@@ -44,7 +43,6 @@ internal class LocalTracksScreenViewModel @Inject constructor(
         _permissionState.update {
             PermissionUiState(
                 permissionGranted = granted,
-                permissionChecked = true
             )
         }
         if (granted) onRestart()
@@ -54,7 +52,6 @@ internal class LocalTracksScreenViewModel @Inject constructor(
         _permissionState.update {
             _permissionState.value.copy(
                 permissionGranted = isGranted,
-                permissionChecked = true
             )
         }
         if (isGranted) onRestart()

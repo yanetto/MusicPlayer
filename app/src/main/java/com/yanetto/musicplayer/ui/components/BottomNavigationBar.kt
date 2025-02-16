@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -27,7 +28,7 @@ fun BottomNavigationBar(navController: NavController) {
         Screen.RemoteTracks
     )
 
-    BottomNavigation (
+    BottomNavigation(
         backgroundColor = MaterialTheme.colorScheme.background,
         contentColor = MaterialTheme.colorScheme.onBackground
     ) {
@@ -35,18 +36,23 @@ fun BottomNavigationBar(navController: NavController) {
         val currentRoute = navBackStackEntry?.destination?.route
 
         screens.forEach { screen ->
+            val icon = screen.imageResId
             BottomNavigationItem(
-                icon = { Icon(
-                    painterResource(id = screen.resourceId),
-                    contentDescription = screen.title,
-                    tint = if (currentRoute == screen.route) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onBackground.copy(0.5f)
-                ) },
-                label = { Text(
-                    text = screen.title,
-                    color = if (currentRoute == screen.route) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onBackground.copy(0.5f)
-                ) },
+                icon = {
+                    if (icon != null) Icon(
+                        painterResource(id = screen.imageResId),
+                        contentDescription = stringResource(screen.titleResId),
+                        tint = if (currentRoute == screen.route) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onBackground.copy(0.5f)
+                    )
+                },
+                label = {
+                    Text(
+                        text = stringResource(screen.titleResId),
+                        color = if (currentRoute == screen.route) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onBackground.copy(0.5f)
+                    )
+                },
                 selected = currentRoute == screen.route,
                 onClick = {
 

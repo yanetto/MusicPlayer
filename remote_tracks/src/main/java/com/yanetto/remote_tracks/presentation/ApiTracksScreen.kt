@@ -21,7 +21,7 @@ fun ApiTracksScreen(
         onSearchTracks = { viewModel.searchTracks(it) },
         onLoadTracks = { viewModel.loadTracks() },
         onTrackClick = {
-            viewModel.playPlaylist(
+            viewModel.setAndPlayPlaylist(
                 (uiState as? TracksUiState.Success)?.tracks ?: emptyList(),
                 it
             )

@@ -43,6 +43,11 @@ android {
 }
 
 dependencies {
+    implementation(project(":local_tracks"))
+    implementation(project(":remote_tracks"))
+    implementation(project(":common_model"))
+    implementation(project(":music_player"))
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -58,11 +63,6 @@ dependencies {
     implementation(libs.androidx.navigation.runtime.ktx)
 
     implementation(libs.hilt.android)
-    implementation(project(":local_tracks"))
-    implementation(project(":remote_tracks"))
-    implementation(project(":common_model"))
-    implementation(project(":music_player"))
-
     kapt(libs.hilt.android.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
 

@@ -5,5 +5,6 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class Album (
-    @SerialName("cover_big") val cover: String
+    @SerialName("cover_big") val cover: String,
+    val title: String?
 )

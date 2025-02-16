@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
 import androidx.media3.session.MediaController
 import com.yanetto.music_player.domain.MusicPlayerController
+import com.yanetto.music_player.domain.toMediaItem
 import com.yanetto.music_player.domain.toMediaItemList
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,9 +41,10 @@ class MusicViewModel @Inject constructor(
         viewModelScope.launch {
             musicPlayer.playerState.collect { playerState ->
                 _uiState.update {
+                    val index = playerState.currentIndex
                     it.copy(
                         currentIndex = playerState.currentIndex,
-                        currentTrack = playerState.currentMediaItem,
+                        currentTrack = playerState.tracks.getOrNull(index)?.toMediaItem(),
                         tracks = playerState.tracks.toMediaItemList(),
                         duration = playerState.duration,
                         isPlaying = playerState.isPlaying

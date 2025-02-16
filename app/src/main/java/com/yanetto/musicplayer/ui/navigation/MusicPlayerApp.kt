@@ -18,8 +18,9 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.yanetto.local_tracks.presentation.localTracksScreen
 import com.yanetto.music_player.presentation.musicPlayerScreen
-import com.yanetto.remote_tracks.presentation.remoteTracksScreen
+import com.yanetto.music_player.presentation.navigateToMusicPlayer
 import com.yanetto.musicplayerapp.presentation.components.BottomNavigationBar
+import com.yanetto.remote_tracks.presentation.remoteTracksScreen
 
 
 @Composable
@@ -45,7 +46,11 @@ fun MusicPlayerApp(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        bottomBar = { if (currentRoute != Screen.PlayerScreen.route) BottomNavigationBar(navController) }
+        bottomBar = {
+            if (currentRoute != Screen.PlayerScreen.route) {
+                BottomNavigationBar(navController)
+            }
+        }
     ) { innerPadding ->
         NavHost(
             navController = navController,
@@ -54,9 +59,9 @@ fun MusicPlayerApp(
                 .padding(innerPadding),
             startDestination = Screen.LocalTracks.route
         ) {
-            localTracksScreen(navigateToPlayer = { navController.navigate(Screen.PlayerScreen.route) })
+            localTracksScreen(navigateToPlayer = { navController.navigateToMusicPlayer() })
 
-            remoteTracksScreen(navigateToPlayer = { navController.navigate(Screen.PlayerScreen.route) })
+            remoteTracksScreen(navigateToPlayer = { navController.navigateToMusicPlayer() })
 
             musicPlayerScreen(navigateBack = { navController.popBackStack() })
         }

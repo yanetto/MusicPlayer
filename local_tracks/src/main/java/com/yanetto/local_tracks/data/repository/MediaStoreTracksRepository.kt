@@ -15,11 +15,25 @@ class MediaStoreTracksRepository @Inject constructor(
 
     companion object {
         private const val PAGE_SIZE = 25
-        const val TAG = "MEDIA_STORE_REPOSITORY"
+        private const val TAG = "MEDIA_STORE_REPOSITORY"
+
+        private const val ALL_MUSIC = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
+        private const val FILTERED_MUSIC = "${MediaStore.Audio.Media.IS_MUSIC} != 0 AND " +
+                "(${MediaStore.Audio.Media.TITLE} LIKE ? OR ${MediaStore.Audio.Media.ARTIST} LIKE ?)"
+        private const val SORT_ORDER = "${MediaStore.Audio.Media.DATE_ADDED} DESC"
     }
 
     private var lastOffset = 0
     private val cachedTracks = mutableListOf<Track>()
+
+    private val projection = arrayOf(
+        MediaStore.Audio.Media._ID,
+        MediaStore.Audio.Media.TITLE,
+        MediaStore.Audio.Media.ARTIST,
+        MediaStore.Audio.Media.DATA,
+        MediaStore.Audio.Media.ALBUM_ID,
+        MediaStore.Audio.Media.ALBUM
+    )
 
     override suspend fun getTracks(): List<Track> {
         return try {
@@ -54,7 +68,7 @@ class MediaStoreTracksRepository @Inject constructor(
         }
     }
 
-    suspend fun loadNext(): List<Track> {
+    override suspend fun loadNext(): List<Track> {
         return try {
             lastOffset += PAGE_SIZE
             val newTracks = queryTracks(limit = PAGE_SIZE, offset = lastOffset)
@@ -73,28 +87,17 @@ class MediaStoreTracksRepository @Inject constructor(
         val tracks = mutableListOf<Track>()
         val contentResolver = context.contentResolver
 
-        val projection = arrayOf(
-            MediaStore.Audio.Media._ID,
-            MediaStore.Audio.Media.TITLE,
-            MediaStore.Audio.Media.ARTIST,
-            MediaStore.Audio.Media.DATA,
-            MediaStore.Audio.Media.ALBUM_ID
-        )
-
         val selection = if (searchQuery.isNullOrBlank()) {
-            "${MediaStore.Audio.Media.IS_MUSIC} != 0"
+            ALL_MUSIC
         } else {
-            "${MediaStore.Audio.Media.IS_MUSIC} != 0 AND " +
-                    "(${MediaStore.Audio.Media.TITLE} LIKE ? OR ${MediaStore.Audio.Media.ARTIST} LIKE ?)"
+            FILTERED_MUSIC
         }
 
         val selectionArgs = searchQuery?.let { arrayOf("%$searchQuery%", "%$searchQuery%") }
 
-        val sortOrder = "${MediaStore.Audio.Media.DATE_ADDED} DESC"
-
         contentResolver.query(
             MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
-            projection, selection, selectionArgs, sortOrder
+            projection, selection, selectionArgs, SORT_ORDER
         )?.use { cursor ->
             if (cursor.moveToPosition(offset)) {
                 var count = 0
@@ -102,12 +105,17 @@ class MediaStoreTracksRepository @Inject constructor(
                     val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID))
                     val name = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE))
                     val artist = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST))
-                    val filePath = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA))
+                    val mediaUri =
+                        cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA))
                     val albumId = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID))
+                    val albumTitle =
+                        cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM))
 
                     val albumCoverUri = getAlbumArtUri(albumId)
 
-                    tracks.add(Track(id, name, artist, filePath, albumCoverUri))
+                    tracks.add(
+                        Track(id, name, artist, mediaUri, albumTitle, albumCoverUri)
+                    )
                     count++
                 } while (cursor.moveToNext() && count < limit)
             }

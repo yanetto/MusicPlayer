@@ -28,7 +28,7 @@ import javax.inject.Singleton
 
 data class PlayerState (
     val tracks: List<Track> = emptyList(),
-    val currentMediaItem: MediaItem? = null,
+    val currentTrack: Track? = null,
     val currentIndex: Int = -1,
     val isPlaying: Boolean = false,
     val progress: Float = 0f,
@@ -72,9 +72,10 @@ class MusicPlayerController @Inject constructor(
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             _playerState.update {
+                val index = mediaController?.currentMediaItemIndex ?: 0
                 it.copy(
-                    currentIndex = mediaController?.currentMediaItemIndex ?: 0,
-                    currentMediaItem = mediaController?.currentMediaItem
+                    currentIndex = index,
+                    currentTrack = it.tracks.getOrNull(index)
                 ) }
             updateDuration()
         }
@@ -84,9 +85,10 @@ class MusicPlayerController @Inject constructor(
                 _playerState.update { it.copy(isPlaying = player.isPlaying) }
             }
             _playerState.update {
+                val index = player.currentMediaItemIndex
                 it.copy(
-                    currentIndex = player.currentMediaItemIndex,
-                    currentMediaItem = mediaController?.currentMediaItem
+                    currentIndex = index,
+                    currentTrack = it.tracks.getOrNull(index)
                 ) }
             updateDuration()
         }
@@ -117,7 +119,7 @@ class MusicPlayerController @Inject constructor(
         _playerState.update {
             it.copy(
                 currentIndex = startIndex,
-                currentMediaItem = playlist[startIndex].toMediaItem()
+                currentTrack = playlist[startIndex]
             ) }
 
         mediaController?.apply {
@@ -133,7 +135,7 @@ class MusicPlayerController @Inject constructor(
             _playerState.update {
                 it.copy(
                     currentIndex = index,
-                    currentMediaItem = _playerState.value.tracks[index].toMediaItem()
+                    currentTrack = _playerState.value.tracks[index]
                 ) }
             mediaController?.seekTo(index, 0)
             mediaController?.play()
@@ -186,9 +188,10 @@ class MusicPlayerController @Inject constructor(
 fun Track.toMediaItem(): MediaItem {
     return MediaItem.Builder()
         .setMediaId(this.id.toString())
-        .setUri(this.filePath)
+        .setUri(this.mediaUri)
         .setMediaMetadata(
             MediaMetadata.Builder()
+                .setAlbumTitle(this.albumTitle)
                 .setTitle(this.title)
                 .setArtist(this.artist)
                 .setArtworkUri(this.albumCoverUri?.toUri())

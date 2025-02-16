@@ -5,4 +5,5 @@
     <string name="next_track">следующий трек</string>
     <string name="album_cover">обложка альбома</string>
     <string name="close">закрыть</string>
+    <string name="album_title">Альбом: %1$s</string>
 </resources>

@@ -53,6 +53,9 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
 
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.navigation.runtime.ktx)
+
     implementation(libs.hilt.android)
     implementation(libs.androidx.media3.session)
     kapt(libs.hilt.android.compiler)

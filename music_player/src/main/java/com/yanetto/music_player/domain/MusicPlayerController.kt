@@ -21,9 +21,20 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
+
+data class PlayerState (
+    val tracks: List<Track> = emptyList(),
+    val currentTrack: Track? = null,
+    val currentIndex: Int = -1,
+    val isPlaying: Boolean = false,
+    val progress: Float = 0f,
+    val duration: Long = 0L,
+    val isSliderMoving: Boolean = false
+)
 
 @Singleton
 class MusicPlayerController @Inject constructor(
@@ -31,25 +42,15 @@ class MusicPlayerController @Inject constructor(
 ) {
     private var mediaController: MediaController? = null
 
-    private val _tracks = MutableStateFlow<List<Track>>(emptyList())
-    private val _currentIndex = MutableStateFlow(-1)
-    private val _isPlaying = MutableStateFlow(false)
-    private val _progress = MutableStateFlow(0f)
-    private val _duration = MutableStateFlow(0L)
-    private val _isSliderMoving = MutableStateFlow(false)
-
-    val tracks: StateFlow<List<Track>> = _tracks.asStateFlow()
-    val currentIndex: StateFlow<Int> = _currentIndex.asStateFlow()
-    val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
-    val progress: StateFlow<Float> = _progress.asStateFlow()
-    val duration: StateFlow<Long> = _duration.asStateFlow()
+    private val _playerState = MutableStateFlow(PlayerState())
+    val playerState: StateFlow<PlayerState> = _playerState.asStateFlow()
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     init {
         startMusicService()
         initializeMediaController()
-        startProgressUpdater()
+        updateProgress()
     }
 
     private fun initializeMediaController() {
@@ -66,31 +67,40 @@ class MusicPlayerController @Inject constructor(
 
     private val playerListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
-            _isPlaying.value = playbackState == Player.STATE_READY && mediaController?.playWhenReady == true
+            _playerState.update { it.copy(isPlaying = playbackState == Player.STATE_READY && mediaController?.playWhenReady == true) }
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-            _currentIndex.value = mediaController?.currentMediaItemIndex ?: 0
-            updateDurationWithRetry()
+            _playerState.update {
+                val index = mediaController?.currentMediaItemIndex ?: 0
+                it.copy(
+                    currentIndex = index,
+                    currentTrack = it.tracks.getOrNull(index)
+                ) }
+            updateDuration()
         }
 
         override fun onEvents(player: Player, events: Player.Events) {
             if (player.playbackState == Player.STATE_READY) {
-                _isPlaying.value = player.isPlaying
+                _playerState.update { it.copy(isPlaying = player.isPlaying) }
             }
-            _currentIndex.value = player.currentMediaItemIndex
-            updateDurationWithRetry()
+            _playerState.update {
+                val index = player.currentMediaItemIndex
+                it.copy(
+                    currentIndex = index,
+                    currentTrack = it.tracks.getOrNull(index)
+                ) }
+            updateDuration()
         }
-
     }
 
-    private fun startProgressUpdater() {
+    private fun updateProgress() {
         scope.launch {
             while (true) {
-                if (_isPlaying.value && !_isSliderMoving.value) {
+                if (_playerState.value.isPlaying && !_playerState.value.isSliderMoving) {
                     val currentPosition = mediaController?.currentPosition ?: 0L
-                    val trackDuration = _duration.value.takeIf { it > 0 } ?: 1L
-                    _progress.value = currentPosition.toFloat() / trackDuration
+                    val trackDuration = _playerState.value.duration.takeIf { it > 0 } ?: 1L
+                    _playerState.update { it.copy(progress = currentPosition.toFloat() / trackDuration) }
                 }
                 delay(200)
             }
@@ -98,13 +108,19 @@ class MusicPlayerController @Inject constructor(
     }
 
     fun setPlaylist(playlist: List<Track>, startIndex: Int = 0) {
-        if (playlist == _tracks.value && _currentIndex.value == startIndex) {
-            if (_isPlaying.value) pause()
+        if (playlist == _playerState.value.tracks && _playerState.value.currentIndex == startIndex) {
+            if (_playerState.value.isPlaying) pause()
             else play()
             return
         }
-        _tracks.value = playlist
-        _currentIndex.value = startIndex
+        _playerState.update {
+            it.copy(tracks = playlist.toList())
+        }
+        _playerState.update {
+            it.copy(
+                currentIndex = startIndex,
+                currentTrack = playlist[startIndex]
+            ) }
 
         mediaController?.apply {
             setMediaItems(playlist.toMediaItemList())
@@ -115,22 +131,26 @@ class MusicPlayerController @Inject constructor(
     }
 
     private fun playTrack(index: Int) {
-        if (index in _tracks.value.indices) {
-            _currentIndex.value = index
+        if (index in _playerState.value.tracks.indices) {
+            _playerState.update {
+                it.copy(
+                    currentIndex = index,
+                    currentTrack = _playerState.value.tracks[index]
+                ) }
             mediaController?.seekTo(index, 0)
             mediaController?.play()
         }
     }
 
     fun nextTrack() {
-        if (_currentIndex.value < _tracks.value.lastIndex) {
-            playTrack(_currentIndex.value + 1)
+        if (_playerState.value.currentIndex < _playerState.value.tracks.lastIndex) {
+            playTrack(_playerState.value.currentIndex + 1)
         }
     }
 
     fun prevTrack() {
-        if (_currentIndex.value > 0) {
-            playTrack(_currentIndex.value - 1)
+        if (_playerState.value.currentIndex > 0) {
+            playTrack(_playerState.value.currentIndex - 1)
         }
     }
 
@@ -138,24 +158,24 @@ class MusicPlayerController @Inject constructor(
     fun pause() = mediaController?.pause()
 
     fun seekTo(position: Long) {
-        _isSliderMoving.value = false
+        _playerState.update { it.copy(isSliderMoving = false) }
         mediaController?.seekTo(position)
-        val trackDuration = _duration.value.takeIf { it > 0 } ?: 1L
-        _progress.value = position.toFloat() / trackDuration
+        val trackDuration = _playerState.value.duration.takeIf { it > 0 } ?: 1L
+        _playerState.update { it.copy(progress = position.toFloat() / trackDuration) }
     }
 
     fun updateSliderMoving(isMoving: Boolean) {
-        _isSliderMoving.value = isMoving
+        _playerState.update { it.copy(isSliderMoving = isMoving) }
     }
 
-    private fun updateDurationWithRetry() {
+    private fun updateDuration() {
         scope.launch {
             var newDuration = mediaController?.duration ?: C.TIME_UNSET
             if (newDuration == C.TIME_UNSET) {
                 delay(200)
                 newDuration = mediaController?.duration ?: 0L
             }
-            _duration.value = maxOf(newDuration, 0L)
+            _playerState.update { it.copy(duration = maxOf(newDuration, 0L)) }
         }
     }
 
@@ -168,9 +188,10 @@ class MusicPlayerController @Inject constructor(
 fun Track.toMediaItem(): MediaItem {
     return MediaItem.Builder()
         .setMediaId(this.id.toString())
-        .setUri(this.filePath)
+        .setUri(this.mediaUri)
         .setMediaMetadata(
             MediaMetadata.Builder()
+                .setAlbumTitle(this.albumTitle)
                 .setTitle(this.title)
                 .setArtist(this.artist)
                 .setArtworkUri(this.albumCoverUri?.toUri())

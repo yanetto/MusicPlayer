@@ -5,10 +5,10 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class ApiTrack (
+internal data class ApiTrack(
     val id: Long,
     val title: String,
-    @SerialName("preview") val filePath: String,
+    @SerialName("preview") val mediaUri: String,
     val artist: Artist,
     val album: Album
 ) {
@@ -17,8 +17,9 @@ data class ApiTrack (
             id = id,
             title = title,
             artist = artist.name,
-            filePath = filePath,
-            albumCoverUri = album.cover
+            mediaUri = mediaUri,
+            albumCoverUri = album.cover,
+            albumTitle = album.title.toString()
         )
     }
 }

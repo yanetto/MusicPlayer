@@ -1,4 +1,4 @@
-package com.yanetto.music_player.presentation
+package com.yanetto.music_player.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -26,7 +26,7 @@ data class MusicPlayerState(
 )
 
 @HiltViewModel
-class MusicViewModel @Inject constructor(
+internal class MusicViewModel @Inject constructor(
     private val musicPlayer: MusicPlayerController
 ) : ViewModel() {
 
@@ -39,39 +39,25 @@ class MusicViewModel @Inject constructor(
 
     private fun observePlayerState() {
         viewModelScope.launch {
-            musicPlayer.tracks.collect { tracks ->
-                _uiState.update { it.copy(tracks = tracks.toMediaItemList()) }
-            }
-        }
-
-        viewModelScope.launch {
-            musicPlayer.currentIndex.collect { index ->
+            musicPlayer.playerState.collect { playerState ->
                 _uiState.update {
+                    val index = playerState.currentIndex
                     it.copy(
-                        currentIndex = index,
-                        currentTrack = musicPlayer.tracks.value.getOrNull(index)?.toMediaItem()
+                        currentIndex = playerState.currentIndex,
+                        currentTrack = playerState.tracks.getOrNull(index)?.toMediaItem(),
+                        tracks = playerState.tracks.toMediaItemList(),
+                        duration = playerState.duration,
+                        isPlaying = playerState.isPlaying
                     )
                 }
             }
         }
 
         viewModelScope.launch {
-            musicPlayer.progress.collect { progress ->
+            musicPlayer.playerState.collect { playerState ->
                 if (!_uiState.value.isSliderMoving) {
-                    _uiState.update { it.copy(progress = progress) }
+                    _uiState.update { it.copy(progress = playerState.progress) }
                 }
-            }
-        }
-
-        viewModelScope.launch {
-            musicPlayer.duration.collect { duration ->
-                _uiState.update { it.copy(duration = duration) }
-            }
-        }
-
-        viewModelScope.launch {
-            musicPlayer.isPlaying.collect { isPlaying ->
-                _uiState.update { it.copy(isPlaying = isPlaying) }
             }
         }
     }
@@ -87,7 +73,9 @@ class MusicViewModel @Inject constructor(
     }
 
     fun seekTo(newPosition: Long) {
-        _uiState.update { it.copy(progress = newPosition.toFloat() / (_uiState.value.duration.takeIf { it > 0 } ?: 1)) }
+        _uiState.update { currentState ->
+            currentState.copy(progress = newPosition.toFloat() / (_uiState.value.duration.takeIf { it > 0 } ?: 1))
+        }
         musicPlayer.seekTo(newPosition)
     }
 }

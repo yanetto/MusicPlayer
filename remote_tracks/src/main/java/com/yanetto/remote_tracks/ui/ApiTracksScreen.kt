@@ -1,4 +1,4 @@
-package com.yanetto.local_tracks.presentation
+package com.yanetto.remote_tracks.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -9,10 +9,10 @@ import com.yanetto.common_tracks.presentation.TracksScreen
 import com.yanetto.common_tracks.presentation.TracksUiState
 
 @Composable
-fun LocalTracksScreen(
+internal fun ApiTracksScreen(
     modifier: Modifier = Modifier,
     navigateToPlayer: () -> Unit,
-    viewModel: LocalTracksScreenViewModel = hiltViewModel()
+    viewModel: ApiTracksScreenViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     TracksScreen(
@@ -21,11 +21,14 @@ fun LocalTracksScreen(
         onSearchTracks = { viewModel.searchTracks(it) },
         onLoadTracks = { viewModel.loadTracks() },
         onTrackClick = {
-            viewModel.playPlaylist(
+            viewModel.setAndPlayPlaylist(
                 (uiState as? TracksUiState.Success)?.tracks ?: emptyList(),
                 it
             )
         },
-        navigateToPlayer = navigateToPlayer
+        navigateToPlayer = navigateToPlayer,
+        onPlayPauseClick = { viewModel.changePlayingState() },
+        loadNext = { viewModel.loadNext() },
+        isCurrentPlayingTrack = { viewModel.isCurrentPlayingTrack(it) }
     )
 }

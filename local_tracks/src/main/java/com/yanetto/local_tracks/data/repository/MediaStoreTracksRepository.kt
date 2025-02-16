@@ -2,72 +2,122 @@ package com.yanetto.local_tracks.data.repository
 import android.content.Context
 import android.net.Uri
 import android.provider.MediaStore
+import android.util.Log
 import com.yanetto.common_model.model.Track
 import com.yanetto.common_model.repository.TracksRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import javax.inject.Inject
+import kotlin.coroutines.cancellation.CancellationException
 
-class MediaStoreTracksRepository @Inject constructor(
+internal class MediaStoreTracksRepository @Inject constructor(
     @ApplicationContext private val context: Context
 ) : TracksRepository {
 
-    override suspend fun getTracks(): List<Track> = withContext(Dispatchers.IO) {
-        queryTracks()
+    companion object {
+        private const val PAGE_SIZE = 25
+        private const val TAG = "MEDIA_STORE_REPOSITORY"
+
+        private const val ALL_MUSIC = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
+        private const val FILTERED_MUSIC = "${MediaStore.Audio.Media.IS_MUSIC} != 0 AND " +
+                "(${MediaStore.Audio.Media.TITLE} LIKE ? OR ${MediaStore.Audio.Media.ARTIST} LIKE ?)"
+        private const val SORT_ORDER = "${MediaStore.Audio.Media.DATE_ADDED} DESC"
     }
 
-    override suspend fun searchTracks(query: String): List<Track> = withContext(Dispatchers.IO) {
-        queryTracks(query)
+    private var lastOffset = 0
+    private val cachedTracks = mutableListOf<Track>()
+
+    private val projection = arrayOf(
+        MediaStore.Audio.Media._ID,
+        MediaStore.Audio.Media.TITLE,
+        MediaStore.Audio.Media.ARTIST,
+        MediaStore.Audio.Media.DATA,
+        MediaStore.Audio.Media.ALBUM_ID,
+        MediaStore.Audio.Media.ALBUM
+    )
+
+    override suspend fun getTracks(): List<Track> {
+        return try {
+            cachedTracks.clear()
+            lastOffset = 0
+            val newTracks = queryTracks(limit = PAGE_SIZE, offset = lastOffset)
+            cachedTracks.addAll(newTracks)
+            cachedTracks
+        } catch (cancellationException: CancellationException) {
+            Log.e(TAG, cancellationException.stackTraceToString())
+            cachedTracks
+        } catch (e: Exception) {
+            Log.d(TAG, e.stackTraceToString())
+            throw e
+        }
+
     }
 
-    private fun queryTracks(searchQuery: String? = null): List<Track> {
+    override suspend fun searchTracks(query: String): List<Track> {
+        return try {
+            cachedTracks.clear()
+            lastOffset = 0
+            val newTracks = queryTracks(searchQuery = query, limit = PAGE_SIZE, offset = lastOffset)
+            cachedTracks.addAll(newTracks)
+            cachedTracks
+        } catch (cancellationException: CancellationException) {
+            Log.e(TAG, cancellationException.stackTraceToString())
+            cachedTracks
+        } catch (e: Exception) {
+            Log.d(TAG, e.stackTraceToString())
+            throw e
+        }
+    }
+
+    override suspend fun loadNext(): List<Track> {
+        return try {
+            lastOffset += PAGE_SIZE
+            val newTracks = queryTracks(limit = PAGE_SIZE, offset = lastOffset)
+            cachedTracks.addAll(newTracks)
+            cachedTracks
+        } catch (cancellationException: CancellationException) {
+            Log.e(TAG, cancellationException.stackTraceToString())
+            cachedTracks
+        } catch (e: Exception) {
+            Log.d(TAG, e.stackTraceToString())
+            throw e
+        }
+    }
+
+    private fun queryTracks(searchQuery: String? = null, limit: Int, offset: Int): List<Track> {
         val tracks = mutableListOf<Track>()
         val contentResolver = context.contentResolver
 
-        val projection = arrayOf(
-            MediaStore.Audio.Media._ID,
-            MediaStore.Audio.Media.TITLE,
-            MediaStore.Audio.Media.ARTIST,
-            MediaStore.Audio.Media.DATA,
-            MediaStore.Audio.Media.ALBUM_ID
-        )
-
         val selection = if (searchQuery.isNullOrBlank()) {
-            "${MediaStore.Audio.Media.IS_MUSIC} != 0"
+            ALL_MUSIC
         } else {
-            "${MediaStore.Audio.Media.IS_MUSIC} != 0 AND " +
-                    "(${MediaStore.Audio.Media.TITLE} LIKE ? OR ${MediaStore.Audio.Media.ARTIST} LIKE ?)"
+            FILTERED_MUSIC
         }
 
-        val selectionArgs = if (searchQuery.isNullOrBlank()) {
-            null
-        } else {
-            arrayOf("%$searchQuery%", "%$searchQuery%")
-        }
-
-        val sortOrder = "${MediaStore.Audio.Media.DATE_ADDED} DESC"
+        val selectionArgs = searchQuery?.let { arrayOf("%$searchQuery%", "%$searchQuery%") }
 
         contentResolver.query(
             MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
-            projection, selection, selectionArgs, sortOrder
+            projection, selection, selectionArgs, SORT_ORDER
         )?.use { cursor ->
-            val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
-            val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
-            val artistColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
-            val dataColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
-            val albumIdColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID)
+            if (cursor.moveToPosition(offset)) {
+                var count = 0
+                do {
+                    val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID))
+                    val name = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE))
+                    val artist = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST))
+                    val mediaUri =
+                        cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA))
+                    val albumId = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID))
+                    val albumTitle =
+                        cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM))
 
-            while (cursor.moveToNext()) {
-                val id = cursor.getLong(idColumn)
-                val name = cursor.getString(nameColumn)
-                val artist = cursor.getString(artistColumn)
-                val filePath = cursor.getString(dataColumn)
-                val albumId = cursor.getLong(albumIdColumn)
+                    val albumCoverUri = getAlbumArtUri(albumId)
 
-                val albumCoverUri = getAlbumArtUri(albumId)
-
-                tracks.add(Track(id, name, artist, filePath, albumCoverUri))
+                    tracks.add(
+                        Track(id, name, artist, mediaUri, albumTitle, albumCoverUri)
+                    )
+                    count++
+                } while (cursor.moveToNext() && count < limit)
             }
         }
         return tracks

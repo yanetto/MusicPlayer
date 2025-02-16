@@ -2,15 +2,37 @@ package com.yanetto.common_tracks.presentation
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -21,11 +43,16 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.yanetto.common_model.model.Track
 import com.yanetto.common_tracks.R
+
+const val LIMIT = 25
+const val DIFF = 5
+const val FIRST_ITEM_INDEX = 0
 
 @Composable
 fun TracksScreen(
@@ -34,10 +61,28 @@ fun TracksScreen(
     onSearchTracks: (String) -> Unit,
     onLoadTracks: () -> Unit,
     onTrackClick: (Int) -> Unit,
-    navigateToPlayer: () -> Unit
+    onPlayPauseClick: () -> Unit,
+    navigateToPlayer: () -> Unit,
+    isCurrentPlayingTrack: (Track) -> Boolean,
+    loadNext: () -> Unit = {}
 ) {
     var searchQuery by remember { mutableStateOf("") }
     val focusManager = LocalFocusManager.current
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(listState.firstVisibleItemIndex) {
+        val lastVisibleIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index
+
+        if (lastVisibleIndex != null) {
+            if (listState.layoutInfo.totalItemsCount >= LIMIT && lastVisibleIndex >= listState.layoutInfo.totalItemsCount - DIFF) {
+                loadNext()
+            }
+        }
+    }
+
+    LaunchedEffect(searchQuery) {
+        listState.animateScrollToItem(FIRST_ITEM_INDEX)
+    }
 
     Column(modifier = modifier.fillMaxSize()) {
         SearchField(
@@ -55,48 +100,85 @@ fun TracksScreen(
         )
 
         when (uiState) {
-            is TracksUiState.Loading -> {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
+            is TracksUiState.Loading, is TracksUiState.NotStarted -> {
+                LoadingScreen()
             }
             is TracksUiState.Success -> {
-                val tracks = uiState.tracks
                 Column(modifier = Modifier.fillMaxSize()) {
-                    LazyColumn(modifier = Modifier.weight(1f)) {
-                        items(tracks) { track ->
-                            TrackItem(track = track, isPlaying = false) { onTrackClick(tracks.indexOf(track)) }
+                    LazyColumn(
+                        modifier = Modifier.weight(1f),
+                        state = listState
+                    ) {
+                        items(uiState.tracks) { track ->
+                            TrackItem(
+                                track = track,
+                                isPlaying = false,
+                                isCurrentTrack = isCurrentPlayingTrack(track)
+                            ) {
+                                onTrackClick(uiState.tracks.indexOf(track))
+                                if (track != uiState.currentTrack) navigateToPlayer()
+                            }
+                        }
+                        if (uiState.isLoadingNext) {
+                            item {
+                                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                    CircularProgressIndicator()
+                                }
+                            }
                         }
                     }
+
                     if ((uiState as? TracksUiState.Success)?.currentTrack != null) {
                         val track = (uiState as? TracksUiState.Success)?.currentTrack
+                        val isPause = !(uiState as? TracksUiState.Success)?.isPlay!!
                         TrackItem(
-                            isPlaying = true,
                             track = track!!,
+                            isPlaying = true,
+                            isPause = isPause,
+                            onPlayPauseClick = onPlayPauseClick,
                             onItemClick = { navigateToPlayer() }
                         )
+
                     }
                 }
             }
             is TracksUiState.Error -> {
-                val message = uiState.message
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(text = message ?: stringResource(R.string.unknown_error_occurred))
-                }
+                ErrorScreen(uiState.message)
             }
             is TracksUiState.Empty -> {
                 EmptyState()
             }
         }
 
-        if ((uiState as? TracksUiState.Success)?.currentTrack != null) {
-            val track = (uiState as? TracksUiState.Success)?.currentTrack
-            TrackItem(
-                isPlaying = true,
-                track = track!!,
-                onItemClick = { navigateToPlayer() }
-            )
+        (uiState as? TracksUiState.Success)?.let { state ->
+            state.currentTrack?.let { track ->
+                TrackItem(
+                    isPlaying = true,
+                    isPause = !state.isPlay,
+                    track = track,
+                    onPlayPauseClick = onPlayPauseClick,
+                    onItemClick = { navigateToPlayer() }
+                )
+            }
         }
+    }
+}
+
+@Composable
+fun LoadingScreen() {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator()
+    }
+}
+
+@Composable
+fun ErrorScreen(message: String?) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Text(
+            text = message ?: stringResource(R.string.unknown_error_occurred),
+            modifier = Modifier.padding(16.dp),
+            textAlign = TextAlign.Center
+        )
     }
 }
 
@@ -151,7 +233,10 @@ fun SearchField(
 
 @Composable
 fun TrackItem(
+    isCurrentTrack: Boolean = false,
     isPlaying: Boolean,
+    isPause: Boolean = false,
+    onPlayPauseClick: () -> Unit = {},
     track: Track,
     onItemClick: () -> Unit
 ) {
@@ -163,7 +248,8 @@ fun TrackItem(
         else CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background)
     ) {
         Row(
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             val image = track.albumCoverUri
 
@@ -188,27 +274,44 @@ fun TrackItem(
             }
 
             Spacer(modifier = Modifier.width(16.dp))
+
+            val mod = if (isPlaying || isCurrentTrack) Modifier.widthIn(0.dp, 250.dp) else Modifier
             Column {
                 Text(
                     text = track.title,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = mod
                 )
                 Text(
                     text = track.artist,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onBackground.copy(0.7f)
+                    color = MaterialTheme.colorScheme.onBackground.copy(0.7f),
+                    modifier = mod
                 )
             }
 
             Spacer(modifier = Modifier.weight(1f))
 
             if (isPlaying) {
-                IconButton(onClick = {}){
-                    Icon(painter = painterResource(R.drawable.playing), contentDescription = stringResource(R.string.current_track))
+                IconButton(
+                    onClick = {
+                        onPlayPauseClick()
+                    }
+                ) {
+                    val icon = if (isPause) painterResource(R.drawable.play) else painterResource(R.drawable.pause)
+                    Icon(
+                        painter = icon,
+                        contentDescription = stringResource(R.string.current_track)
+                    )
                 }
+            } else if (isCurrentTrack) {
+                Icon(
+                    painter = painterResource(R.drawable.playing),
+                    contentDescription = stringResource(R.string.current_track)
+                )
             }
         }
     }
